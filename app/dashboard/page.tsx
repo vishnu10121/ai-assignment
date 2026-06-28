@@ -107,26 +107,26 @@ export default function DashboardPage() {
   }, [router]);
 
   const apiCall = async (endpoint: string, options: any = {}) => {
-  try {
-    const response = await axios(`/api${endpoint}`, {
-      withCredentials: true,
-      headers: { 
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      ...options,
-      data: options.body
-    });
-    return response.data;
-  } catch (error: any) {
-    console.error('API Error:', error.response?.data || error.message);
-    if (error.response?.status === 401) {
-      localStorage.removeItem('token');
-      router.push('/login');
+    try {
+      const response = await axios(`/api${endpoint}`, {
+        withCredentials: true,
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        ...options,
+        data: options.body
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error('API Error:', error.response?.data || error.message);
+      if (error.response?.status === 401) {
+        localStorage.removeItem('token');
+        router.push('/login');
+      }
+      throw error;
     }
-    throw error;
-  }
-};
+  };
 
   const loadGroups = async () => {
     try {
@@ -202,7 +202,7 @@ export default function DashboardPage() {
     const amount = parseFloat(expenseForm.amount);
     const membersList = members;
 
-    let splits = [];
+    let splits: { user_id: number; amount: number }[] = [];
     if (expenseForm.splitType === 'equal') {
       const perPerson = amount / membersList.length;
       splits = membersList.map(m => ({ user_id: m.user_id, amount: perPerson }));
@@ -213,7 +213,7 @@ export default function DashboardPage() {
       splits = [];
       splitInputs.forEach((input: any, index) => {
         const val = parseFloat(input.value);
-        if (val) {
+        if (val && !isNaN(val)) {
           splits.push({ user_id: membersList[index].user_id, amount: val });
           totalSplit += val;
         }
@@ -252,13 +252,14 @@ export default function DashboardPage() {
   };
 
   const handleAddMember = async () => {
-    const email = (document.getElementById('newMemberEmail') as HTMLInputElement).value;
+    const emailInput = document.getElementById('newMemberEmail') as HTMLInputElement;
+    const email = emailInput?.value;
     if (email) {
       await apiCall(`/groups/${currentGroupId}/members`, {
         method: 'POST',
         body: { email }
       });
-      (document.getElementById('newMemberEmail') as HTMLInputElement).value = '';
+      if (emailInput) emailInput.value = '';
       await loadMembers(currentGroupId);
     }
   };
@@ -272,10 +273,20 @@ export default function DashboardPage() {
 
   const handleSettleUp = async (e: React.FormEvent) => {
     e.preventDefault();
-    const fromUserId = parseInt((document.getElementById('settlementFrom') as HTMLSelectElement).value);
-    const toUserId = parseInt((document.getElementById('settlementTo') as HTMLSelectElement).value);
-    const amount = parseFloat((document.getElementById('settlementAmount') as HTMLInputElement).value);
-    const note = (document.getElementById('settlementNote') as HTMLInputElement).value;
+    const fromSelect = document.getElementById('settlementFrom') as HTMLSelectElement;
+    const toSelect = document.getElementById('settlementTo') as HTMLSelectElement;
+    const amountInput = document.getElementById('settlementAmount') as HTMLInputElement;
+    const noteInput = document.getElementById('settlementNote') as HTMLInputElement;
+
+    const fromUserId = parseInt(fromSelect?.value || '0');
+    const toUserId = parseInt(toSelect?.value || '0');
+    const amount = parseFloat(amountInput?.value || '0');
+    const note = noteInput?.value || '';
+
+    if (!fromUserId || !toUserId || !amount) {
+      alert('Please fill all required fields');
+      return;
+    }
 
     if (fromUserId === toUserId) {
       alert('Cannot settle with yourself');
@@ -296,7 +307,7 @@ export default function DashboardPage() {
 
   const handleImportCSV = async () => {
     const fileInput = document.getElementById('csvFile') as HTMLInputElement;
-    const file = fileInput.files?.[0];
+    const file = fileInput?.files?.[0];
     if (!file) {
       alert('Please select a CSV file');
       return;
@@ -346,26 +357,32 @@ export default function DashboardPage() {
         // Add event listeners
         document.querySelectorAll('.approve-btn').forEach(btn => {
           btn.addEventListener('click', async (e) => {
-            const id = (e.target as HTMLButtonElement).dataset.id;
-            await fetch(`/api/import/anomalies/${id}/approve`, {
-              method: 'POST',
-              credentials: 'include',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ approved: true })
-            });
-            (e.target as HTMLButtonElement).closest('.anomaly-item')?.remove();
-            await loadGroupData(currentGroupId);
+            const target = e.target as HTMLButtonElement;
+            const id = target.dataset.id;
+            if (id) {
+              await fetch(`/api/import/anomalies/${id}/approve`, {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ approved: true })
+              });
+              target.closest('.anomaly-item')?.remove();
+              await loadGroupData(currentGroupId);
+            }
           });
         });
 
         document.querySelectorAll('.reject-btn').forEach(btn => {
           btn.addEventListener('click', async (e) => {
-            const id = (e.target as HTMLButtonElement).dataset.id;
-            await fetch(`/api/import/anomalies/${id}/reject`, {
-              method: 'DELETE',
-              credentials: 'include'
-            });
-            (e.target as HTMLButtonElement).closest('.anomaly-item')?.remove();
+            const target = e.target as HTMLButtonElement;
+            const id = target.dataset.id;
+            if (id) {
+              await fetch(`/api/import/anomalies/${id}/reject`, {
+                method: 'DELETE',
+                credentials: 'include'
+              });
+              target.closest('.anomaly-item')?.remove();
+            }
           });
         });
       }
