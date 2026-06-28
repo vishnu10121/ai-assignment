@@ -3,16 +3,55 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
+// Types
+interface Fundamentals {
+  currentPrice: number;
+  marketCap: number;
+  trailingPE: number;
+  revenueGrowth: number;
+  profitMargins: number;
+  recommendationKey: string;
+}
+
+interface TraceItem {
+  id: string;
+  status: 'think' | 'act' | 'obsv';
+  description: string;
+}
+
+interface ResearchResult {
+  company: string;
+  ticker: string;
+  exchange: string;
+  verdict: 'bullish' | 'bearish' | 'neutral';
+  verdictSummary: string;
+  fundamentals: Fundamentals;
+  bullCase: string[];
+  bearCase: string[];
+  keyRisks: string[];
+  trace: TraceItem[];
+  news: string[];
+  timestamp: string;
+  processingTime: number;
+}
+
 export default function ResearchPage() {
-  const [loading, setLoading] = useState(true);
-  const [result, setResult] = useState(null);
-  const [error, setError] = useState(null);
-  const [step, setStep] = useState(0);
-  const [time, setTime] = useState(0);
-  const [company, setCompany] = useState('');
+  const [loading, setLoading] = useState<boolean>(true);
+  const [result, setResult] = useState<ResearchResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [step, setStep] = useState<number>(0);
+  const [time, setTime] = useState<number>(0);
+  const [company, setCompany] = useState<string>('');
   const router = useRouter();
 
-  const steps = ['RESOLVE_TICKER', 'FETCH_FUNDAMENTALS', 'SCAN_NEWS', 'ANALYZE_SENTIMENT', 'WEIGH_THESIS', 'SYNTHESIZE_VERDICT'];
+  const steps: string[] = [
+    'RESOLVE_TICKER',
+    'FETCH_FUNDAMENTALS',
+    'SCAN_NEWS',
+    'ANALYZE_SENTIMENT',
+    'WEIGH_THESIS',
+    'SYNTHESIZE_VERDICT'
+  ];
 
   useEffect(() => {
     const name = sessionStorage.getItem('researchCompany');
@@ -22,29 +61,34 @@ export default function ResearchPage() {
     }
     setCompany(name);
     doResearch(name);
-  }, []);
+  }, [router]);
 
   useEffect(() => {
-    let timer;
+    let timer: NodeJS.Timeout | null = null;
     if (loading) {
-      timer = setInterval(() => setTime(t => t + 1), 1000);
+      timer = setInterval(() => setTime((t) => t + 1), 1000);
     }
-    return () => clearInterval(timer);
+    return () => {
+      if (timer) clearInterval(timer);
+    };
   }, [loading]);
 
   useEffect(() => {
+    let interval: NodeJS.Timeout | null = null;
     if (loading) {
-      const interval = setInterval(() => {
-        setStep(s => {
+      interval = setInterval(() => {
+        setStep((s) => {
           if (s < steps.length - 1) return s + 1;
           return s;
         });
       }, 7000);
-      return () => clearInterval(interval);
     }
-  }, [loading]);
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [loading, steps.length]);
 
-  const doResearch = async (name) => {
+  const doResearch = async (name: string) => {
     try {
       const res = await fetch('/api/research', {
         method: 'POST',
@@ -55,7 +99,7 @@ export default function ResearchPage() {
       if (!res.ok) throw new Error(data.error || 'Failed');
       setResult(data);
     } catch (err) {
-      setError(err.message);
+      setError((err as Error).message);
     } finally {
       setLoading(false);
     }
@@ -63,13 +107,13 @@ export default function ResearchPage() {
 
   const goBack = () => router.push('/');
 
-  const fmtTime = (s) => {
-    const m = Math.floor(s / 60);
-    const sec = s % 60;
+  const fmtTime = (seconds: number): string => {
+    const m = Math.floor(seconds / 60);
+    const sec = seconds % 60;
     return `${m}:${String(sec).padStart(2, '0')}`;
   };
 
-  // Error
+  // Error State
   if (error) {
     return (
       <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '20px' }}>
@@ -82,7 +126,7 @@ export default function ResearchPage() {
     );
   }
 
-  // Loading
+  // Loading State
   if (loading) {
     return (
       <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '20px' }}>
@@ -192,7 +236,7 @@ export default function ResearchPage() {
     );
   }
 
-  // Result
+  // Result State
   return (
     <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '20px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 0', borderBottom: '1px solid rgba(255,255,255,0.06)', marginBottom: '40px' }}>
@@ -239,7 +283,7 @@ export default function ResearchPage() {
 
           {/* Fundamentals */}
           <div style={{ background: 'rgba(20,20,30,0.8)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '20px', padding: '24px 28px', marginBottom: '16px' }}>
-            <div style={{ fontSize: '16px', fontWeight: '600', marginBottom: '14px' }}>Fundamentals</div>
+            <div style={{ fontSize: '16px', fontWeight: '600', marginBottom: '14px' }}>📊 Fundamentals</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '10px' }}>
               {[
                 ['Price', `$${result.fundamentals.currentPrice.toFixed(2)}`],
@@ -250,7 +294,7 @@ export default function ResearchPage() {
               ].map(([label, value]) => (
                 <div key={label} style={{ background: 'rgba(255,255,255,0.02)', padding: '12px 14px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.06)' }}>
                   <div style={{ color: '#8892b0', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{label}</div>
-                  <div style={{ fontSize: '16px', fontWeight: '600', marginTop: '3px', color: value.includes('%') ? '#00ff88' : '#ffffff' }}>{value}</div>
+                  <div style={{ fontSize: '16px', fontWeight: '600', marginTop: '3px', color: (value.includes('%') && !value.includes('$')) ? '#00ff88' : '#ffffff' }}>{value}</div>
                 </div>
               ))}
             </div>
@@ -258,13 +302,13 @@ export default function ResearchPage() {
 
           {/* Trace */}
           <div style={{ background: 'rgba(20,20,30,0.8)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '20px', padding: '24px 28px', marginBottom: '16px' }}>
-            <div style={{ fontSize: '16px', fontWeight: '600', marginBottom: '14px' }}>Agent Reasoning</div>
+            <div style={{ fontSize: '16px', fontWeight: '600', marginBottom: '14px' }}>🤖 Agent Reasoning</div>
             <div style={{ background: 'rgba(0,0,0,0.4)', borderRadius: '12px', padding: '14px 18px', fontSize: '12px', maxHeight: '250px', overflowY: 'auto' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', color: '#8892b0', fontSize: '11px' }}>
                 <span>AGENT.TRACE.LOG</span>
                 <span>{result.trace.length} steps</span>
               </div>
-              {result.trace.map((t, i) => (
+              {result.trace.map((t: TraceItem, i: number) => (
                 <div key={i} style={{ display: 'flex', gap: '10px', padding: '3px 0', borderBottom: '1px solid rgba(255,255,255,0.03)', fontSize: '11px' }}>
                   <span style={{ color: '#4a4a5a', minWidth: '40px' }}>{t.id}</span>
                   <span style={{ minWidth: '45px', fontWeight: '600', fontSize: '10px', color: t.status === 'think' ? '#ffc107' : t.status === 'act' ? '#00ff88' : '#64b5f6' }}>{t.status.toUpperCase()}</span>
@@ -276,19 +320,19 @@ export default function ResearchPage() {
 
           {/* Bull/Bear */}
           <div style={{ background: 'rgba(20,20,30,0.8)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '20px', padding: '24px 28px', marginBottom: '16px' }}>
-            <div style={{ fontSize: '16px', fontWeight: '600', marginBottom: '14px' }}>Investment Thesis</div>
+            <div style={{ fontSize: '16px', fontWeight: '600', marginBottom: '14px' }}>📈 Investment Thesis</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
               <div style={{ padding: '16px', borderRadius: '14px', background: 'rgba(0,255,136,0.04)', border: '1px solid rgba(0,255,136,0.1)' }}>
-                <h4 style={{ color: '#00ff88', marginBottom: '10px', fontSize: '14px' }}>BULL CASE</h4>
-                {result.bullCase.map((p, i) => (
+                <h4 style={{ color: '#00ff88', marginBottom: '10px', fontSize: '14px' }}>🟢 BULL CASE</h4>
+                {result.bullCase.map((p: string, i: number) => (
                   <div key={i} style={{ color: '#8892b0', fontSize: '13px', padding: '3px 0', paddingLeft: '14px', position: 'relative' }}>
                     <span style={{ position: 'absolute', left: 0, color: '#00ff88' }}>▸</span>{p}
                   </div>
                 ))}
               </div>
               <div style={{ padding: '16px', borderRadius: '14px', background: 'rgba(255,107,107,0.04)', border: '1px solid rgba(255,107,107,0.1)' }}>
-                <h4 style={{ color: '#ff6b6b', marginBottom: '10px', fontSize: '14px' }}>BEAR CASE</h4>
-                {result.bearCase.map((p, i) => (
+                <h4 style={{ color: '#ff6b6b', marginBottom: '10px', fontSize: '14px' }}>🔴 BEAR CASE</h4>
+                {result.bearCase.map((p: string, i: number) => (
                   <div key={i} style={{ color: '#8892b0', fontSize: '13px', padding: '3px 0', paddingLeft: '14px', position: 'relative' }}>
                     <span style={{ position: 'absolute', left: 0, color: '#ff6b6b' }}>▸</span>{p}
                   </div>
@@ -299,9 +343,9 @@ export default function ResearchPage() {
 
           {/* Risks */}
           <div style={{ background: 'rgba(20,20,30,0.8)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '20px', padding: '24px 28px', marginBottom: '16px' }}>
-            <div style={{ fontSize: '16px', fontWeight: '600', marginBottom: '14px' }}>Key Risks</div>
+            <div style={{ fontSize: '16px', fontWeight: '600', marginBottom: '14px' }}>⚠️ Key Risks</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-              {result.keyRisks.map((r, i) => (
+              {result.keyRisks.map((r: string, i: number) => (
                 <span key={i} style={{ padding: '4px 14px', background: 'rgba(255,107,107,0.06)', border: '1px solid rgba(255,107,107,0.12)', borderRadius: '14px', fontSize: '12px', color: '#ff6b6b' }}>{r}</span>
               ))}
             </div>
@@ -309,14 +353,14 @@ export default function ResearchPage() {
 
           {/* News */}
           <div style={{ background: 'rgba(20,20,30,0.8)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '20px', padding: '24px 28px' }}>
-            <div style={{ fontSize: '16px', fontWeight: '600', marginBottom: '14px' }}>Recent News</div>
-            {result.news.map((n, i) => (
+            <div style={{ fontSize: '16px', fontWeight: '600', marginBottom: '14px' }}>📰 Recent News</div>
+            {result.news.map((n: string, i: number) => (
               <div key={i} style={{ padding: '8px 0', borderBottom: i < result.news.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none', color: '#8892b0', fontSize: '13px' }}>{n}</div>
             ))}
           </div>
 
           <div style={{ textAlign: 'center', color: '#4a4a5a', fontSize: '11px', marginTop: '16px' }}>
-            Completed in {result.processingTime || 60}s • {new Date(result.timestamp).toLocaleString()}
+            ⏱️ Completed in {result.processingTime || 60}s • {new Date(result.timestamp).toLocaleString()}
           </div>
         </div>
       )}
